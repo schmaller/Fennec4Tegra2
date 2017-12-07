@@ -1,0 +1,352 @@
+diff --git a/build/autoconf/arch.m4 b/build/autoconf/arch.m4
+--- a/build/autoconf/arch.m4
++++ b/build/autoconf/arch.m4
+@@ -202,7 +202,7 @@ fi
+ AC_SUBST(MOZ_THUMB2)
+ 
+ if test "$CPU_ARCH" = "arm"; then
+-  NEON_FLAGS="-mfpu=neon"
++  NEON_FLAGS="-mfpu=vfpv3-d16"
+   AC_MSG_CHECKING(for ARM SIMD support in compiler)
+   # We try to link so that this also fails when
+   # building with LTO.
+@@ -228,19 +228,19 @@ if test "$CPU_ARCH" = "arm"; then
+                  result="yes", result="no")
+   AC_MSG_RESULT("$result")
+   if test "$result" = "yes"; then
+-      AC_DEFINE(HAVE_ARM_NEON)
+-      HAVE_ARM_NEON=1
++      dnl AC_DEFINE(HAVE_ARM_NEON)
++      dnl HAVE_ARM_NEON=1
+ 
+       dnl We don't need to build NEON support if we're targetting a non-NEON device.
+       dnl This matches media/webrtc/trunk/webrtc/build/common.gypi.
+-      if test -n "$ARM_ARCH"; then
+-          if test "$ARM_ARCH" -lt 7; then
++      dnl if test -n "$ARM_ARCH"; then
++      dnl    if test "$ARM_ARCH" -lt 7; then
+               BUILD_ARM_NEON=
+-          else
+-              AC_DEFINE(BUILD_ARM_NEON)
+-              BUILD_ARM_NEON=1
+-          fi
+-      fi
++      dnl    else
++      dnl        AC_DEFINE(BUILD_ARM_NEON)
++      dnl        BUILD_ARM_NEON=1
++      dnl    fi
++      dnl fi
+   fi
+ 
+ fi # CPU_ARCH = arm
+diff --git a/build/gyp.mozbuild b/build/gyp.mozbuild
+--- a/build/gyp.mozbuild
++++ b/build/gyp.mozbuild
+@@ -58,7 +58,7 @@ gyp_vars.update({
+ 
+      # turn off mandatory use of NEON and instead use NEON detection
+     'arm_neon': 0,
+-    'arm_neon_optional': 1,
++    'arm_neon_optional': 0,
+ 
+     'moz_webrtc_mediacodec': 0,
+ 
+diff --git a/gfx/skia/moz.build b/gfx/skia/moz.build
+--- a/gfx/skia/moz.build
++++ b/gfx/skia/moz.build
+@@ -636,21 +636,13 @@ if CONFIG['INTEL_ARCHITECTURE']:
+     SOURCES['skia/src/opts/SkOpts_ssse3.cpp'].flags += skia_opt_flags
+ elif CONFIG['CPU_ARCH'] == 'arm' and CONFIG['GNU_CC']:
+     SOURCES += [
+-        'skia/src/opts/SkBitmapProcState_arm_neon.cpp',
+-        'skia/src/opts/SkBitmapProcState_matrixProcs_neon.cpp',
+         'skia/src/opts/SkBitmapProcState_opts_none.cpp',
+         'skia/src/opts/SkBlitMask_opts_arm.cpp',
+-        'skia/src/opts/SkBlitMask_opts_arm_neon.cpp',
+         'skia/src/opts/SkBlitRow_opts_arm.cpp',
+-        'skia/src/opts/SkBlitRow_opts_arm_neon.cpp',
+     ]
+-    SOURCES['skia/src/opts/SkBitmapProcState_arm_neon.cpp'].flags += skia_opt_flags
+-    SOURCES['skia/src/opts/SkBitmapProcState_matrixProcs_neon.cpp'].flags += skia_opt_flags
+     SOURCES['skia/src/opts/SkBitmapProcState_opts_none.cpp'].flags += skia_opt_flags
+     SOURCES['skia/src/opts/SkBlitMask_opts_arm.cpp'].flags += skia_opt_flags
+-    SOURCES['skia/src/opts/SkBlitMask_opts_arm_neon.cpp'].flags += skia_opt_flags
+     SOURCES['skia/src/opts/SkBlitRow_opts_arm.cpp'].flags += skia_opt_flags
+-    SOURCES['skia/src/opts/SkBlitRow_opts_arm_neon.cpp'].flags += skia_opt_flags
+ elif CONFIG['CPU_ARCH'] == 'aarch64' and CONFIG['GNU_CC']:
+     SOURCES += [
+         'skia/src/opts/SkBitmapProcState_arm_neon.cpp',
+diff --git a/layout/base/nsDocumentViewer.cpp b/layout/base/nsDocumentViewer.cpp
+--- a/layout/base/nsDocumentViewer.cpp
++++ b/layout/base/nsDocumentViewer.cpp
+@@ -370,6 +370,7 @@ protected:
+ 
+ #ifdef NS_PRINTING
+   unsigned      mClosingWhilePrinting : 1;
++  RefPtr<nsPrintEngine>          mPrintEngine;
+ 
+ #if NS_PRINT_PREVIEW
+   unsigned                         mPrintPreviewZoomed : 1;
+@@ -380,7 +381,6 @@ protected:
+   nsCOMPtr<nsIPrintSettings>       mCachedPrintSettings;
+   nsCOMPtr<nsIWebProgressListener> mCachedPrintWebProgressListner;
+ 
+-  RefPtr<nsPrintEngine>          mPrintEngine;
+   float                            mOriginalPrintPreviewScale;
+   float                            mPrintPreviewZoom;
+   nsAutoPtr<AutoPrintEventDispatcher> mAutoBeforeAndAfterPrint;
+@@ -549,10 +549,12 @@ nsDocumentViewer::~nsDocumentViewer()
+     mDocument->Destroy();
+   }
+ 
++#ifdef NS_PRINTING
+   if (mPrintEngine) {
+     mPrintEngine->Destroy();
+     mPrintEngine = nullptr;
+   }
++#endif
+ 
+   MOZ_RELEASE_ASSERT(mDestroyRefCount == 0);
+   NS_ASSERTION(!mPresShell && !mPresContext,
+diff --git a/media/libtheora/moz.build b/media/libtheora/moz.build
+--- a/media/libtheora/moz.build
++++ b/media/libtheora/moz.build
+@@ -89,8 +89,7 @@ if CONFIG['GNU_AS']:
+         ]
+         for var in ('OC_ARM_ASM',
+                     'OC_ARM_ASM_EDSP',
+-                    'OC_ARM_ASM_MEDIA',
+-                    'OC_ARM_ASM_NEON'):
++                    'OC_ARM_ASM_MEDIA'):
+             DEFINES[var] = True
+         # The Android NDK doesn't pre-define anything to indicate the OS it's
+         # on, so do it for them.
+@@ -109,7 +108,9 @@ if CONFIG['GNU_AS']:
+         ASFLAGS += [
+             '-march=armv7-a',
+         ]
+-        ASFLAGS += CONFIG['NEON_FLAGS']
++        ASFLAGS += [
++           '-mfpu=neon',
++        ]
+ 
+         if CONFIG['CLANG_CXX']:
+             ASFLAGS += [
+diff --git a/mobile/android/app/mobile.js b/mobile/android/app/mobile.js
+--- a/mobile/android/app/mobile.js
++++ b/mobile/android/app/mobile.js
+@@ -188,9 +188,9 @@ pref("xpinstall.whitelist.add", "https:/
+ pref("xpinstall.signatures.required", true);
+ 
+ pref("extensions.enabledScopes", 1);
+-pref("extensions.autoupdate.enabled", true);
++pref("extensions.autoupdate.enabled", false);
+ pref("extensions.autoupdate.interval", 86400);
+-pref("extensions.update.enabled", true);
++pref("extensions.update.enabled", false);
+ pref("extensions.update.interval", 86400);
+ pref("extensions.dss.enabled", false);
+ pref("extensions.dss.switchPending", false);
+@@ -198,12 +198,12 @@ pref("extensions.ignoreMTimeChanges", fa
+ pref("extensions.logging.enabled", false);
+ pref("extensions.hideInstallButton", true);
+ pref("extensions.showMismatchUI", false);
+-pref("extensions.hideUpdateButton", false);
++pref("extensions.hideUpdateButton", true);
+ pref("extensions.strictCompatibility", false);
+ pref("extensions.minCompatibleAppVersion", "11.0");
+ 
+-pref("extensions.update.url", "https://versioncheck.addons.mozilla.org/update/VersionCheck.php?reqVersion=%REQ_VERSION%&id=%ITEM_ID%&version=%ITEM_VERSION%&maxAppVersion=%ITEM_MAXAPPVERSION%&status=%ITEM_STATUS%&appID=%APP_ID%&appVersion=%APP_VERSION%&appOS=%APP_OS%&appABI=%APP_ABI%&locale=%APP_LOCALE%&currentAppVersion=%CURRENT_APP_VERSION%&updateType=%UPDATE_TYPE%&compatMode=%COMPATIBILITY_MODE%");
+-pref("extensions.update.background.url", "https://versioncheck-bg.addons.mozilla.org/update/VersionCheck.php?reqVersion=%REQ_VERSION%&id=%ITEM_ID%&version=%ITEM_VERSION%&maxAppVersion=%ITEM_MAXAPPVERSION%&status=%ITEM_STATUS%&appID=%APP_ID%&appVersion=%APP_VERSION%&appOS=%APP_OS%&appABI=%APP_ABI%&locale=%APP_LOCALE%&currentAppVersion=%CURRENT_APP_VERSION%&updateType=%UPDATE_TYPE%&compatMode=%COMPATIBILITY_MODE%");
++pref("extensions.update.url", "");
++pref("extensions.update.background.url", "");
+ 
+ pref("extensions.hotfix.id", "firefox-android-hotfix@mozilla.org");
+ pref("extensions.hotfix.cert.checkAttributes", true);
+@@ -393,7 +393,7 @@ pref("devtools.remote.wifi.enabled", fal
+ pref("font.size.inflation.minTwips", 0);
+ 
+ // When true, zooming will be enabled on all sites, even ones that declare user-scalable=no.
+-pref("browser.ui.zoom.force-user-scalable", false);
++pref("browser.ui.zoom.force-user-scalable", true);
+ 
+ // When removing this Nightly flag, also remember to remove the flags surrounding this feature
+ // in GeckoPreferences and BrowserApp (see bug 1245930).
+diff --git a/mobile/android/base/java/org/mozilla/gecko/BrowserApp.java b/mobile/android/base/java/org/mozilla/gecko/BrowserApp.java
+--- a/mobile/android/base/java/org/mozilla/gecko/BrowserApp.java
++++ b/mobile/android/base/java/org/mozilla/gecko/BrowserApp.java
+@@ -623,7 +623,7 @@ public class BrowserApp extends GeckoApp
+         boolean supported = HardwareUtils.isSupportedSystem();
+         if (supported) {
+             GeckoLoader.loadMozGlue(appContext);
+-            supported = GeckoLoader.neonCompatible();
++            supported = true; // GeckoLoader.neonCompatible();
+         }
+         if (!supported) {
+             // This build does not support the Android version of the device; Exit early.
+diff --git a/mobile/android/base/java/org/mozilla/gecko/GeckoApp.java b/mobile/android/base/java/org/mozilla/gecko/GeckoApp.java
+--- a/mobile/android/base/java/org/mozilla/gecko/GeckoApp.java
++++ b/mobile/android/base/java/org/mozilla/gecko/GeckoApp.java
+@@ -913,7 +913,7 @@ public abstract class GeckoApp extends G
+         boolean supported = HardwareUtils.isSupportedSystem();
+         if (supported) {
+             GeckoLoader.loadMozGlue(getApplicationContext());
+-            supported = GeckoLoader.neonCompatible();
++            supported = true; // GeckoLoader.neonCompatible()
+         }
+         if (!supported) {
+             // This build does not support the Android version of the device: Show an error and finish the app.
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -5780,3 +5780,9 @@ pref("layers.omtp.enabled", true);
+ pref("layers.omtp.enabled", false);
+ #endif
+ pref("layers.omtp.release-capture-on-main-thread", false);
++
++// Additional settings for Fennec4Tegra2
++pref("privacy.donottrackheader.enabled",    true);
++pref("privacy.trackingprotection.enabled",  true);
++pref("network.cookie.cookieBehavior", 1);
++pref("media.autoplay.enabled", false);
+diff --git a/widget/android/moz.build b/widget/android/moz.build
+--- a/widget/android/moz.build
++++ b/widget/android/moz.build
+@@ -51,12 +51,17 @@ UNIFIED_SOURCES += [
+     'nsIdleServiceAndroid.cpp',
+     'nsLookAndFeel.cpp',
+     'nsNativeThemeAndroid.cpp',
+-    'nsPrintOptionsAndroid.cpp',
+     'nsScreenManagerAndroid.cpp',
+     'nsWidgetFactory.cpp',
+     'nsWindow.cpp',
+ ]
+ 
++if CONFIG['NS_PRINTING']:
++    UNIFIED_SOURCES += [
++        'nsPrintOptionsAndroid.cpp',
++    ]
++	
++
+ include('/ipc/chromium/chromium-config.mozbuild')
+ 
+ FINAL_LIBRARY = 'xul'
+diff --git a/widget/android/nsDeviceContextAndroid.cpp b/widget/android/nsDeviceContextAndroid.cpp
+--- a/widget/android/nsDeviceContextAndroid.cpp
++++ b/widget/android/nsDeviceContextAndroid.cpp
+@@ -20,6 +20,7 @@ NS_IMPL_ISUPPORTS(nsDeviceContextSpecAnd
+ already_AddRefed<PrintTarget>
+ nsDeviceContextSpecAndroid::MakePrintTarget()
+ {
++#ifdef NS_PRINTING
+   nsresult rv =
+     NS_GetSpecialDirectory(NS_OS_TEMP_DIR, getter_AddRefs(mTempFile));
+   NS_ENSURE_SUCCESS(rv, nullptr);
+@@ -35,7 +36,10 @@ nsDeviceContextSpecAndroid::MakePrintTar
+ 
+   // XXX: what should we do here for size? screen size?
+   IntSize size(480, 800);
+-
++#else
++  nsCOMPtr<nsIFileOutputStream> stream = do_CreateInstance("@mozilla.org/network/file-output-stream;1");
++  IntSize size(480, 800);
++#endif
+   return PrintTargetPDF::CreateOrNull(stream, size);
+ }
+ 
+@@ -44,7 +48,9 @@ nsDeviceContextSpecAndroid::Init(nsIWidg
+                              nsIPrintSettings* aPS,
+                              bool aIsPrintPreview)
+ {
++#ifdef NS_PRINTING
+   mPrintSettings = aPS;
++#endif
+   return NS_OK;
+ }
+ 
+@@ -60,6 +66,7 @@ nsDeviceContextSpecAndroid::BeginDocumen
+ NS_IMETHODIMP
+ nsDeviceContextSpecAndroid::EndDocument()
+ {
++#ifdef NS_PRINTING
+   nsString targetPath;
+   nsCOMPtr<nsIFile> destFile;
+   mPrintSettings->GetToFileName(targetPath);
+@@ -79,5 +86,6 @@ nsDeviceContextSpecAndroid::EndDocument(
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
+   destFile->SetPermissions(0666);
++#endif
+   return NS_OK;
+ }
+diff --git a/widget/android/nsDeviceContextAndroid.h b/widget/android/nsDeviceContextAndroid.h
+--- a/widget/android/nsDeviceContextAndroid.h
++++ b/widget/android/nsDeviceContextAndroid.h
+@@ -30,7 +30,9 @@ public:
+     NS_IMETHOD EndPage() override { return NS_OK; }
+ 
+ private:
++#ifdef NS_PRINTING
+     nsCOMPtr<nsIPrintSettings> mPrintSettings;
+     nsCOMPtr<nsIFile> mTempFile;
++#endif
+ };
+ #endif // nsDeviceContextAndroid_h__
+diff --git a/widget/android/nsWidgetFactory.cpp b/widget/android/nsWidgetFactory.cpp
+--- a/widget/android/nsWidgetFactory.cpp
++++ b/widget/android/nsWidgetFactory.cpp
+@@ -20,8 +20,10 @@
+ #include "nsClipboard.h"
+ #include "nsClipboardHelper.h"
+ #include "nsTransferable.h"
++#ifdef NS_PRINTING
+ #include "nsPrintOptionsAndroid.h"
+ #include "nsPrintSession.h"
++#endif
+ #include "nsDeviceContextAndroid.h"
+ #include "nsHTMLFormatConverter.h"
+ #include "nsXULAppAPI.h"
+@@ -37,8 +39,10 @@ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsTransferable)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsClipboard)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsClipboardHelper)
++#ifdef NS_PRINTING
+ NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsPrintOptionsAndroid, Init)
+ NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsPrintSession, Init)
++#endif
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsDeviceContextSpecAndroid)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsHTMLFormatConverter)
+ NS_GENERIC_FACTORY_CONSTRUCTOR(nsAndroidBridge)
+@@ -82,8 +86,10 @@ NS_DEFINE_NAMED_CID(NS_IDLE_SERVICE_CID)
+ NS_DEFINE_NAMED_CID(NS_TRANSFERABLE_CID);
+ NS_DEFINE_NAMED_CID(NS_CLIPBOARD_CID);
+ NS_DEFINE_NAMED_CID(NS_CLIPBOARDHELPER_CID);
++#ifdef NS_PRINTING
+ NS_DEFINE_NAMED_CID(NS_PRINTSETTINGSSERVICE_CID);
+ NS_DEFINE_NAMED_CID(NS_PRINTSESSION_CID);
++#endif
+ NS_DEFINE_NAMED_CID(NS_DEVICE_CONTEXT_SPEC_CID);
+ NS_DEFINE_NAMED_CID(NS_HTMLFORMATCONVERTER_CID);
+ NS_DEFINE_NAMED_CID(NS_GFXINFO_CID);
+@@ -101,8 +107,10 @@ static const mozilla::Module::CIDEntry k
+   { &kNS_TRANSFERABLE_CID, false, nullptr, nsTransferableConstructor },
+   { &kNS_CLIPBOARD_CID, false, nullptr, nsClipboardConstructor },
+   { &kNS_CLIPBOARDHELPER_CID, false, nullptr, nsClipboardHelperConstructor },
++#ifdef NS_PRINTING
+   { &kNS_PRINTSETTINGSSERVICE_CID, false, nullptr, nsPrintOptionsAndroidConstructor },
+   { &kNS_PRINTSESSION_CID, false, nullptr, nsPrintSessionConstructor },
++#endif
+   { &kNS_DEVICE_CONTEXT_SPEC_CID, false, nullptr, nsDeviceContextSpecAndroidConstructor },
+   { &kNS_HTMLFORMATCONVERTER_CID, false, nullptr, nsHTMLFormatConverterConstructor },
+   { &kNS_GFXINFO_CID, false, nullptr, mozilla::widget::GfxInfoConstructor },
+@@ -122,8 +130,10 @@ static const mozilla::Module::ContractID
+   { "@mozilla.org/widget/transferable;1", &kNS_TRANSFERABLE_CID },
+   { "@mozilla.org/widget/clipboard;1", &kNS_CLIPBOARD_CID },
+   { "@mozilla.org/widget/clipboardhelper;1", &kNS_CLIPBOARDHELPER_CID },
++#ifdef NS_PRINTING
+   { "@mozilla.org/gfx/printsettings-service;1", &kNS_PRINTSETTINGSSERVICE_CID },
+   { "@mozilla.org/gfx/printsession;1", &kNS_PRINTSESSION_CID },
++#endif
+   { "@mozilla.org/gfx/devicecontextspec;1", &kNS_DEVICE_CONTEXT_SPEC_CID },
+   { "@mozilla.org/widget/htmlformatconverter;1", &kNS_HTMLFORMATCONVERTER_CID },
+   { "@mozilla.org/gfx/info;1", &kNS_GFXINFO_CID },

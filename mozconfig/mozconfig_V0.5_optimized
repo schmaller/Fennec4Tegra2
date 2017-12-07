@@ -1,0 +1,53 @@
+# Build Firefox for Android:
+ac_add_options --enable-application=mobile/android
+ac_add_options --with-app-name=Fennec4Tegra2
+ac_add_options --with-app-basename=Fennec4Tegra2
+ac_add_options --with-branding=mobile/android/branding/Fennec4Tegra2
+# ac_add_options --enable-release
+
+ac_add_options --target=arm-linux-androideabi
+ac_add_options --with-android-min-sdk=16
+ac_add_options --disable-debug        # faster !?
+ac_add_options --enable-optimize='-Oz -mfpu=vfpv3-d16 -mtune=cortex-a9'
+ac_add_options --enable-mobile-optimize 
+
+# Copied from FDroid config for Fennec
+ac_add_options --disable-updater
+ac_add_options --disable-crashreporter
+ac_add_options --disable-tests
+
+ac_add_options --disable-webrtc
+# ac_add_options --disable-necko-wifi   ##** Try with it - maybe it's useful
+ac_add_options --disable-printing  ## doesn't work for android
+# ac_add_options --disable-accessibility
+# ac_add_options --enable-extensions=-pocket,-screenshot,-webcompat,-presentation,-aushelper,-shield-recipe-client,-flyweb,-pdfjs
+ac_add_options --enable-extensions=default
+
+## DISABLING THIS IS PROHIBITED FOR PROPER TABS/SETTINGS
+# ac_add_options --disable-parental-controls
+
+# With the following Android SDK and NDK:
+ac_add_options --with-android-sdk="/home/daniel/.mozbuild/android-sdk-linux"
+ac_add_options --with-android-ndk="/home/daniel/.mozbuild/android-ndk-r15c"
+ac_add_options --with-ccache="/usr/bin/ccache"
+
+# Write build artifacts to:
+mk_add_options MOZ_OBJDIR=./objdir-droid
+
+# Other mk options
+mk_add_options MOZ_TELEMETRY_REPORTING=0
+mk_add_options MOZ_WEBSPEECH=0
+mk_add_options NS_PRINTING=0
+mk_add_options MOZ_ANDROID_GCM=0
+mk_add_options MOZ_ANDROID_MMA=0
+mk_add_options MOZ_ANDROID_BEAM=0
+mk_add_options MOZ_ANDROID_MLS_STUMBLER=0
+mk_add_options MOZ_SERVICES_HEALTHREPORT=0
+mk_add_options MOZ_ANDROID_ACTIVITY_STREAM=0
+mk_add_options MOZ_ANDROID_POCKET=0
+mk_add_options MOZ_ANDROID_PWA=0
+
+
+
+
+

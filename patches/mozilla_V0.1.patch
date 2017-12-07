@@ -1,0 +1,149 @@
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -1732,3 +1732,11 @@ pref("browser.onboarding.updatetour", "p
+ 
+ // Preference that allows individual users to disable Screenshots.
+ pref("extensions.screenshots.disabled", false);
++
++// Additional settings for Fennec4Tegra2
++pref("browser.ui.zoom.force-user-scalable", true);
++pref("privacy.donottrackheader.enabled",    true);
++pref("privacy.trackingprotection.enabled",  true);
++
++pref("network.cookie.cookieBehaviour", 1);
++pref("media.autoplay.enabled", false);
+diff --git a/browser/branding/aurora/configure.sh b/browser/branding/aurora/configure.sh
+--- a/browser/branding/aurora/configure.sh
++++ b/browser/branding/aurora/configure.sh
+@@ -4,4 +4,3 @@
+ 
+ MOZ_APP_DISPLAYNAME=FirefoxDeveloperEdition
+ MOZ_APP_REMOTINGNAME=firefox-dev
+-MOZ_DEV_EDITION=1
+diff --git a/build/autoconf/arch.m4 b/build/autoconf/arch.m4
+--- a/build/autoconf/arch.m4
++++ b/build/autoconf/arch.m4
+@@ -202,7 +202,7 @@ fi
+ AC_SUBST(MOZ_THUMB2)
+ 
+ if test "$CPU_ARCH" = "arm"; then
+-  NEON_FLAGS="-mfpu=neon"
++  NEON_FLAGS="-mfpu=vfpv3-d16"
+   AC_MSG_CHECKING(for ARM SIMD support in compiler)
+   # We try to link so that this also fails when
+   # building with LTO.
+@@ -228,19 +228,19 @@ if test "$CPU_ARCH" = "arm"; then
+                  result="yes", result="no")
+   AC_MSG_RESULT("$result")
+   if test "$result" = "yes"; then
+-      AC_DEFINE(HAVE_ARM_NEON)
+-      HAVE_ARM_NEON=1
++      dnl AC_DEFINE(HAVE_ARM_NEON)
++      dnl HAVE_ARM_NEON=1
+ 
+       dnl We don't need to build NEON support if we're targetting a non-NEON device.
+       dnl This matches media/webrtc/trunk/webrtc/build/common.gypi.
+-      if test -n "$ARM_ARCH"; then
+-          if test "$ARM_ARCH" -lt 7; then
++      dnl if test -n "$ARM_ARCH"; then
++      dnl    if test "$ARM_ARCH" -lt 7; then
+               BUILD_ARM_NEON=
+-          else
+-              AC_DEFINE(BUILD_ARM_NEON)
+-              BUILD_ARM_NEON=1
+-          fi
+-      fi
++      dnl    else
++      dnl        AC_DEFINE(BUILD_ARM_NEON)
++      dnl        BUILD_ARM_NEON=1
++      dnl    fi
++      dnl fi
+   fi
+ 
+ fi # CPU_ARCH = arm
+diff --git a/build/gyp.mozbuild b/build/gyp.mozbuild
+--- a/build/gyp.mozbuild
++++ b/build/gyp.mozbuild
+@@ -58,7 +58,7 @@ gyp_vars.update({
+ 
+      # turn off mandatory use of NEON and instead use NEON detection
+     'arm_neon': 0,
+-    'arm_neon_optional': 1,
++    'arm_neon_optional': 0,
+ 
+     'moz_webrtc_mediacodec': 0,
+ 
+diff --git a/gfx/skia/moz.build b/gfx/skia/moz.build
+--- a/gfx/skia/moz.build
++++ b/gfx/skia/moz.build
+@@ -636,21 +636,13 @@ if CONFIG['INTEL_ARCHITECTURE']:
+     SOURCES['skia/src/opts/SkOpts_ssse3.cpp'].flags += skia_opt_flags
+ elif CONFIG['CPU_ARCH'] == 'arm' and CONFIG['GNU_CC']:
+     SOURCES += [
+-        'skia/src/opts/SkBitmapProcState_arm_neon.cpp',
+-        'skia/src/opts/SkBitmapProcState_matrixProcs_neon.cpp',
+         'skia/src/opts/SkBitmapProcState_opts_none.cpp',
+         'skia/src/opts/SkBlitMask_opts_arm.cpp',
+-        'skia/src/opts/SkBlitMask_opts_arm_neon.cpp',
+         'skia/src/opts/SkBlitRow_opts_arm.cpp',
+-        'skia/src/opts/SkBlitRow_opts_arm_neon.cpp',
+     ]
+-    SOURCES['skia/src/opts/SkBitmapProcState_arm_neon.cpp'].flags += skia_opt_flags
+-    SOURCES['skia/src/opts/SkBitmapProcState_matrixProcs_neon.cpp'].flags += skia_opt_flags
+     SOURCES['skia/src/opts/SkBitmapProcState_opts_none.cpp'].flags += skia_opt_flags
+     SOURCES['skia/src/opts/SkBlitMask_opts_arm.cpp'].flags += skia_opt_flags
+-    SOURCES['skia/src/opts/SkBlitMask_opts_arm_neon.cpp'].flags += skia_opt_flags
+     SOURCES['skia/src/opts/SkBlitRow_opts_arm.cpp'].flags += skia_opt_flags
+-    SOURCES['skia/src/opts/SkBlitRow_opts_arm_neon.cpp'].flags += skia_opt_flags
+ elif CONFIG['CPU_ARCH'] == 'aarch64' and CONFIG['GNU_CC']:
+     SOURCES += [
+         'skia/src/opts/SkBitmapProcState_arm_neon.cpp',
+diff --git a/media/libtheora/moz.build b/media/libtheora/moz.build
+--- a/media/libtheora/moz.build
++++ b/media/libtheora/moz.build
+@@ -89,8 +89,7 @@ if CONFIG['GNU_AS']:
+         ]
+         for var in ('OC_ARM_ASM',
+                     'OC_ARM_ASM_EDSP',
+-                    'OC_ARM_ASM_MEDIA',
+-                    'OC_ARM_ASM_NEON'):
++                    'OC_ARM_ASM_MEDIA'):
+             DEFINES[var] = True
+         # The Android NDK doesn't pre-define anything to indicate the OS it's
+         # on, so do it for them.
+@@ -109,7 +108,9 @@ if CONFIG['GNU_AS']:
+         ASFLAGS += [
+             '-march=armv7-a',
+         ]
+-        ASFLAGS += CONFIG['NEON_FLAGS']
++        ASFLAGS += [
++           '-mfpu=neon',
++        ]
+ 
+         if CONFIG['CLANG_CXX']:
+             ASFLAGS += [
+diff --git a/mobile/android/base/java/org/mozilla/gecko/BrowserApp.java b/mobile/android/base/java/org/mozilla/gecko/BrowserApp.java
+--- a/mobile/android/base/java/org/mozilla/gecko/BrowserApp.java
++++ b/mobile/android/base/java/org/mozilla/gecko/BrowserApp.java
+@@ -622,7 +622,7 @@ public class BrowserApp extends GeckoApp
+ 
+         showSplashScreen = true;
+         GeckoLoader.loadMozGlue(appContext);
+-        if (!HardwareUtils.isSupportedSystem() || !GeckoLoader.neonCompatible()) {
++        if (!HardwareUtils.isSupportedSystem() || false  /*!GeckoLoader.neonCompatible()*/ ) {
+             // This build does not support the Android version of the device; Exit early.
+             super.onCreate(savedInstanceState);
+             return;
+diff --git a/mobile/android/base/java/org/mozilla/gecko/GeckoApp.java b/mobile/android/base/java/org/mozilla/gecko/GeckoApp.java
+--- a/mobile/android/base/java/org/mozilla/gecko/GeckoApp.java
++++ b/mobile/android/base/java/org/mozilla/gecko/GeckoApp.java
+@@ -918,7 +918,7 @@ public abstract class GeckoApp extends G
+         // custom tabs it may not be.
+         GeckoLoader.loadMozGlue(getApplicationContext());
+ 
+-        if (!HardwareUtils.isSupportedSystem() || !GeckoLoader.neonCompatible()) {
++        if (!HardwareUtils.isSupportedSystem() || false /*!GeckoLoader.neonCompatible()*/ ) {
+             // This build does not support the Android version of the device: Show an error and finish the app.
+             mIsAbortingAppLaunch = true;
+             super.onCreate(savedInstanceState);
