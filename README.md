@@ -4,13 +4,13 @@
 ## History
 This project is based on the patch from [Wryun](https://github.com/wryun/)
 and his great idea and work
-[firefox-ics-tegra2](https://github.com/wryun/firefox-ics-tegra2)
-__Many thanks__
+[firefox-ics-tegra2](https://github.com/wryun/firefox-ics-tegra2)  
+__Many thanks__  
 ...to be completed...
 
 ## Patches
 Besides the patches to build NEON-free binaries I focused on reducing
-runtime overhead of needless "_features_" and __posh__ extenstions.
+runtime overhead of needless "_features_" and __posh__ extenstions.  
 Due to the different handling of configure options in the android build
 scripts this approach didn't seem to be too successful.  
 I appreciate any hints for further improvements of the performance.
