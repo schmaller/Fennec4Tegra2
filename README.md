@@ -13,7 +13,7 @@ __Many thanks__
 
 ## Patches
 Besides the patches to build NEON-free binaries I focused on reducing
-runtime overhead of needless "_features_" and __posh__ extenstions.
+runtime overhead of needless "_features_" and __posh__ extenstions.  
 Due to the different handling of configure options in the android build
 scripts this approach didn't seem to be too successful.  
 I appreciate any hints for further performance improvements.
